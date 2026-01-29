@@ -1,0 +1,93 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  name      String
+  password  String
+
+  tracks      Track[]
+}
+
+model Track {
+  id                String   @id @default(uuid())
+  name              String  
+  triggerId         String
+  userId            Int
+  createdAt         DateTime  @default(now())
+
+  trigger           Trigger? 
+  TrackRun          TrackRun[]
+  Actions           Action[]
+  user              User @relation(fields: [userId], references: [id])
+}
+
+model Trigger{
+  id                String              @id @default(uuid())
+  trackId           String              @unique
+  triggertypeId     String 
+
+  triggertype       AvailableTriggers   @relation(fields: [triggertypeId], references: [id])
+  Track             Track               @relation(fields: [trackId], references: [id])
+
+}
+
+model AvailableTriggers{ 
+  id        String  @id @default(uuid())
+  name      String
+  image     String  @default("")
+
+  trigger   Trigger[]
+}
+
+model Action{
+  id                String              @id @default(uuid())
+  trackId           String              
+  actiontypeId      String
+  sortingOrder      Int                 @default(0)
+  metadata          Json
+
+  Track             Track               @relation(fields: [trackId], references: [id])
+  type              AvailableActions    @relation(fields: [actiontypeId], references: [id])
+}
+
+
+model AvailableActions{ 
+  id        String  @id @default(uuid())
+  name      String
+  image     String  @default("")
+
+  action    Action[]
+}
+
+model TrackRun{
+  id                String              @id @default(uuid())
+  trackId           String     
+  metadata          Json
+
+  Track             Track               @relation(fields: [trackId], references: [id])
+  TrackRunOutBox    TrackRunOutBox?
+
+}
+
+model TrackRunOutBox{
+  id                      String              @id @default(uuid())
+  trackOutBoxId           String              @unique
+
+  Track                   TrackRun            @relation(fields: [trackOutBoxId], references: [id])
+
+}
