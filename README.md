@@ -20,23 +20,23 @@ FlowFuse utilizes a distributed system design to ensure reliability and performa
 
 ```mermaid
 graph TD
-    User[User] -->|Interact| FE[Frontend (Next.js)]
-    FE -->|API Requests| PB[Primary Backend]
+    User[User] -->|Interact| FE["Frontend (Next.js)"]
+    FE -->|API Requests| PB["Primary Backend"]
     
-    Webhook[External Webhook] -->|Trigger| WH[Webhook Service]
-    WH -->|Store Event| DB[(PostgreSQL)]
+    Webhook["External Webhook"] -->|Trigger| WH["Webhook Service"]
+    WH -->|Store Event| DB[("PostgreSQL")]
     
     PB -->|CRUD Tracks| DB
     
-    subgraph Reliability Layer
-    PB -->|Log Action| OB[Outbox Table]
-    Processor[Processor Service] -->|Poll| OB
+    subgraph "Reliability Layer"
+    PB -->|Log Action| OB["Outbox Table"]
+    Processor["Processor Service"] -->|Poll| OB
     end
     
-    Processor -->|Push Event| Kafka[Apache Kafka]
+    Processor -->|Push Event| Kafka["Apache Kafka"]
     
-    Kafka -->|Consume| Worker[Worker Service]
-    Worker -->|Execute| External[External APIs / Email]
+    Kafka -->|Consume| Worker["Worker Service"]
+    Worker -->|Execute| External["External APIs / Email"]
 ```
 
 ### Components
