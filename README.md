@@ -1,154 +1,141 @@
+<div align="center">
+
 # ⚡ FlowFuse
 
-**FlowFuse** is a scalable, open-source workflow automation platform designed to integrate seamlessly with your favorite apps. Built as a high-performance alternative to Zapier, FlowFuse enables users to create automated workflows (Tracks) using a visual interface, powered by a robust, event-driven microservices architecture.
+### A visual workflow builder backed by an event-driven services architecture
+
+Create webhook-triggered workflows, connect ordered actions, and process work asynchronously. FlowFuse is a TypeScript portfolio project demonstrating workflow orchestration, a transactional outbox, Kafka-based processing, and multilingual story search.
+
+![TypeScript](https://img.shields.io/badge/TypeScript-services-blue?logo=typescript)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-database-4169E1?logo=postgresql&logoColor=white)
+![Kafka](https://img.shields.io/badge/Apache_Kafka-events-231F20?logo=apachekafka&logoColor=white)
+
+</div>
 
 ---
 
-## 🚀 Features
+## What FlowFuse does
 
-- **Visual Workflow Builder**: Create deeply customizable automation tracks with an intuitive frontend.
-- **Microservices Architecture**: Decoupled services for maximum scalability and maintainability.
-- **Reliable Execution**: Implements the **Transactional Outbox Pattern** to ensure no event is lost during database-to-queue handovers.
-- **Scalable Processing**: Powered by **Apache Kafka** to handle high-throughput event streaming.
-- **Secure & Robust**: Built with modern best practices, including JWT authentication and secure webhook handling.
+- **Build workflows:** Configure a Track with a trigger and an ordered list of actions in the Next.js interface.
+- **Accept webhook events:** The webhook service records workflow runs and outbox entries in PostgreSQL.
+- **Process asynchronously:** A relay publishes outbox events to Kafka, and workers execute actions and advance workflow stages.
+- **Find related stories:** Create English or Hindi stories, enrich them with Gemini embeddings, and retrieve semantically similar stories from PostgreSQL with pgvector.
 
----
+> FlowFuse is a project prototype. Email is the implemented workflow action; meeting and calendar integrations and production operations need further work. Run it in a development environment and configure external services before using those paths.
 
-## 🏗️ Architecture
-
-FlowFuse utilizes a distributed system design to ensure reliability and performance.
+## Architecture
 
 ```mermaid
-graph TD
-    User[User] -->|Interact| FE["Frontend (Next.js)"]
-    FE -->|API Requests| PB["Primary Backend"]
-    
-    Webhook["External Webhook"] -->|Trigger| WH["Webhook Service"]
-    WH -->|Store Event| DB[("PostgreSQL")]
-    
-    PB -->|CRUD Tracks| DB
-    
-    subgraph "Reliability Layer"
-    PB -->|Log Action| OB["Outbox Table"]
-    Processor["Processor Service"] -->|Poll| OB
-    end
-    
-    Processor -->|Push Event| Kafka["Apache Kafka"]
-    
-    Kafka -->|Consume| Worker["Worker Service"]
-    Worker -->|Execute| External["External APIs / Email"]
+flowchart LR
+  User[User] --> UI[Next.js frontend]
+  UI --> API[Primary Express API]
+  API --> DB[(PostgreSQL)]
+  Hook[Webhook service] --> DB
+  API -->|Story + outbox in one transaction| DB
+  DB --> Relay[Outbox processor]
+  Relay --> Kafka[(Kafka)]
+  Kafka --> Worker[Worker service]
+  Worker -->|Workflow actions| Integrations[External services]
+  Worker -->|Gemini embeddings and tags| DB
+  API -->|pgvector cosine search| DB
 ```
 
-### Components
+The outbox makes story creation and the intent to publish `story.created` atomic. The processor sends that event through the existing `track-events` topic. The worker generates a normalized 768-dimensional embedding and stores it with enrichment metadata. Similarity search uses pgvector cosine distance and an HNSW index. Enrichment retries use bounded exponential delays; after five attempts, the event is sent to `story-enrichment-dlq`.
 
-1.  **Frontend (`/frontend`)**:
-    -   Built with **Next.js 15**, **React 19**, and **Tailwind CSS**.
-    -   Provides the UI for users to sign up, manage dashboard, and configure "Tracks" (automation workflows).
+## Repository map
 
-2.  **Primary Backend (`/primary-backend`)**:
-    -   **Node.js/Express** REST API.
-    -   Manages user authentication, track configurations, and defining triggers/actions.
-    -   Uses **Prisma** with **PostgreSQL** for data persistence.
+| Directory | Responsibility |
+| --- | --- |
+| `frontend/` | Next.js workflow builder and user interface |
+| `primary-backend/` | Express API, Prisma schema, story API and database migrations |
+| `webhooks/` | Incoming webhook service |
+| `processor/` | PostgreSQL outbox relay to Kafka |
+| `worker/` | Kafka consumers, workflow actions and story enrichment |
 
-3.  **Webhook Service (`/webhooks`)**:
-    -   Standalone service to ingest incoming webhooks from third-party services.
-    -   Trigger entry points for automation flows.
+## Requirements
 
-4.  **Processor Service (`/processor`)**:
-    -   Background service ensuring data consistency.
-    -   Polls the database **Outbox** table and executes reliable publishing to **Kafka**.
-    -    Prevents race conditions and dual-write issues.
+- Node.js 18 or newer and npm
+- PostgreSQL
+- Apache Kafka
+- A Gemini API key for story enrichment ([Google AI Studio](https://aistudio.google.com/app/apikey))
 
-5.  **Worker Service (`/worker`)**:
-    -   Consumes messages from **Kafka**.
-    -   Executes the actual logic (e.g., sending an email via Nodemailer, utilizing SolAPI, etc.).
+Each service has its own `package.json` and dependencies. Configure the service `.env` files with the appropriate `DATABASE_URL`; set `GEMINI_API_KEY` for the worker. `KAFKA_BROKERS` is a comma-separated broker list and defaults to `localhost:9092` in the processor and worker.
 
----
+## Run locally
 
-## 🛠️ Tech Stack
+Start PostgreSQL and Kafka first, then install dependencies and generate each Prisma client:
 
--   **Languages**: TypeScript
--   **Frontend**: Next.js, React, Lucide React, Tailwind CSS
--   **Backend**: Node.js, Express.js
--   **Database**: PostgreSQL, Prisma ORM
--   **Message Broker**: Apache Kafka
--   **Validation**: Zod
--   **Authentication**: JWT (JSON Web Tokens)
+```bash
+cd primary-backend && npm install && npx prisma generate && npx prisma migrate deploy
+cd ../processor && npm install && npx prisma generate
+cd ../worker && npm install && npx prisma generate
+cd ../webhooks && npm install && npx prisma generate
+cd ../frontend && npm install
+```
 
----
+The story migration enables PostgreSQL's `vector` extension. The database role must have permission to enable it, or the extension must be provisioned by a database administrator.
 
-## 🏁 Getting Started
+Run each service in its own terminal. The backend and frontend defaults would both use port 3000, so start the frontend on the port already allowed by the backend's local CORS configuration:
 
-### Prerequisites
+```bash
+# primary-backend/
+npm start
 
-Ensure you have the following installed:
--   **Node.js** (v18 or higher)
--   **PostgreSQL**
--   **Apache Kafka** (running locally or via Docker)
--   **npm** or **yarn**
+# processor/, worker/, and webhooks/ (one terminal per service)
+npm start
 
-### Installation
+# frontend/
+npm run dev -- -p 3002
+```
 
-Since FlowFuse is a mono-repo structure, you will need to set up each service individually.
+The frontend is available at `http://localhost:3002`; the primary API listens on `http://localhost:3000`.
 
-#### 1. Database Setup
-Ensure your PostgreSQL database is running. Update the `DATABASE_URL` in the `.env` files of backend services.
+## Story API
 
-#### 2. Primary Backend
+Create a story:
+
+```http
+POST /api/v1/stories
+Content-Type: application/json
+
+{
+  "title": "The Banyan Tree",
+  "text": "A village ...",
+  "language": "en",
+  "genre": "folk-tale"
+}
+```
+
+Find the nearest enriched stories (default `k=5`, maximum `20`):
+
+```http
+GET /api/v1/stories/{id}/similar?k=5
+```
+
+The search excludes the source story and returns cosine similarity scores. If enrichment is still in progress, the endpoint responds with `202`; if enrichment exhausted its retries, it responds with `503` and the event is available in the dead-letter topic.
+
+Seed 200 original demo stories split across English and Hindi. Each seeded story enters the same outbox and enrichment pipeline:
+
 ```bash
 cd primary-backend
-npm install
-npx prisma migrate dev
-npm start
+npm run seed:stories
 ```
 
-#### 3. Webhook Service
-```bash
-cd webhooks
-npm install
-npx prisma generate
-npm start
-```
+## Configuration
 
-#### 4. Processor Service
-```bash
-cd processor
-npm install
-npx prisma generate
-npm start
-```
+| Variable | Service | Default | Purpose |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | Backend, processor, worker, webhooks | — | PostgreSQL connection string |
+| `GEMINI_API_KEY` | Worker | — | Gemini embedding API key |
+| `GEMINI_EMBEDDING_MODEL` | Worker | `gemini-embedding-001` | Embedding model name |
+| `KAFKA_BROKERS` | Processor, worker | `localhost:9092` | Comma-separated Kafka broker addresses |
 
-#### 5. Worker Service
-```bash
-cd worker
-npm install
-npx prisma generate
-npm start
-```
+Gemini's embedding models support multilingual semantic search. The selected 768-dimensional output is normalized before storage so cosine distance compares vector direction consistently. See [Gemini embeddings documentation](https://ai.google.dev/gemini-api/docs/embeddings) for model and language details.
 
-#### 6. Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-```
+## Development status
 
-The frontend will be available at `http://localhost:3000`.
+FlowFuse demonstrates the end-to-end architecture, but performance and recommendation quality have not been benchmarked against a running deployment. Measure query latency and inspect top-k relevance on the target database and corpus before making throughput or accuracy claims. Operational work such as authenticated webhook signatures, idempotent external side effects, observability, deployment configuration, and broader integration coverage remains suitable follow-up work.
 
----
+## License
 
-## 🤝 Contributing
-
-Contributions are welcome! Please fork the repository and submit a pull request for any enhancements or bug fixes.
-
-1.  Fork the Project
-2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the Branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
-
----
-
-## 📄 License
-
-Distributed under the ISC License. See `package.json` in individual services for more information.
+ISC. See the individual service manifests for package metadata.

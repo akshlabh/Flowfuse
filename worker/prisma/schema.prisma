@@ -91,3 +91,15 @@ model TrackRunOutBox{
   Track                   TrackRun            @relation(fields: [trackOutBoxId], references: [id])
 
 }
+
+model Story {
+  id                String   @id
+  title             String
+  text              String
+  language          String
+  genre             String?
+  mood              String?
+  tags              String[] @default([])
+  enrichedAt        DateTime?
+  enrichmentStatus  String   @default("pending")
+}

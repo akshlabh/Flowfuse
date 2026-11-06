@@ -5,6 +5,7 @@ import cors from "cors";
 import dotenv from "dotenv"
 import { triggerRouter } from "./router/trigger";
 import { actionRouter } from "./router/action";
+import { storyRouter } from "./router/story";
 
 dotenv.config();
 
@@ -24,5 +25,6 @@ app.use("/api/v1/track", trackRouter);
 app.use("/api/v1/trigger", triggerRouter);
 
 app.use("/api/v1/action", actionRouter);
+app.use("/api/v1/stories", storyRouter);
 
 app.listen(3000);

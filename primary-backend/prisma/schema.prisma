@@ -91,3 +91,24 @@ model TrackRunOutBox{
   Track                   TrackRun            @relation(fields: [trackOutBoxId], references: [id])
 
 }
+
+model Story {
+  id          String   @id @default(uuid())
+  title       String
+  text        String   @db.Text
+  language    String   @default("en")
+  genre       String?
+  mood        String?
+  tags        String[] @default([])
+  createdAt   DateTime @default(now())
+  enrichedAt  DateTime?
+  enrichmentStatus String @default("pending")
+  outbox      StoryOutbox?
+}
+
+model StoryOutbox {
+  id        String   @id @default(uuid())
+  storyId   String   @unique
+  createdAt DateTime @default(now())
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+}
